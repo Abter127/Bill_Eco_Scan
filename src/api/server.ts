@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { LogController, type FastifyInstance } from 'fastify';
 import type { Db } from '../db/sqlite.js';
 import { registerMerchantRoutes } from './routes/merchant.js';
 import { registerClaimRoutes } from './routes/claim.js';
@@ -18,10 +18,11 @@ export async function buildServer(opts: ServerOptions): Promise<FastifyInstance>
   const app = Fastify({
     logger: opts.logger ?? false,
     // The claim page URL *is* the bearer token, so per-request logging is off:
-    // keeping it out of access logs is cheaper than redacting it later. Only
-    // set when a logger exists, since the option is otherwise a no-op that
-    // emits a deprecation notice. (Fastify 6 moves this under `logController`.)
-    ...(opts.logger ? { disableRequestLogging: true } : {}),
+    // keeping it out of access logs is cheaper than redacting it later.
+    //
+    // Set via `logController` rather than the top-level `disableRequestLogging`,
+    // which Fastify 5 deprecates (with a warning on every boot) and removes in 6.
+    logController: new LogController({ disableRequestLogging: true }),
     bodyLimit: 8 * 1024 * 1024,
     trustProxy: true,
   });
