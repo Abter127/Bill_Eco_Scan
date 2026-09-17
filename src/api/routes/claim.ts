@@ -8,6 +8,10 @@ import * as ledgers from '../../db/repo/ledgers.js';
 import { resolveClaimToken, claimBill, retroactiveClaim } from '../../services/claim.js';
 import { buildBillView } from '../../services/billview.js';
 import { renderClaimPage, renderFirstBillState } from '../../web/claim-page.js';
+import { renderCapturePage } from '../../web/capture-page.js';
+import { createManualBill } from '../../services/manual.js';
+import { parseAmountToMinor } from '../../core/money.js';
+import { financialYearOf } from '../../core/time.js';
 import { page } from '../../web/layout.js';
 import { html } from '../../web/html.js';
 import { signSession, sessionCookie, verifySession, readCookie } from '../auth.js';
@@ -254,6 +258,87 @@ export function registerClaimRoutes(app: FastifyInstance, db: Db): void {
         '',
       ));
   });
+
+  /**
+   * J2 — add a paper bill from a shop that does not use Billing Hub. The photo
+   * path needs the OCR engine (a fixture in this build), so the page leads with
+   * manual entry, which is a real end-to-end slice.
+   */
+  app.get('/capture', async (req, reply) => {
+    return reply
+      .header('Cache-Control', 'no-store, private')
+      .type('text/html; charset=utf-8')
+      .send(renderCapturePage({ signedIn: currentAccount(req) !== null }));
+  });
+
+  app.post<{ Body: { shop?: string; amount?: string; date?: string; gstin?: string; phone?: string } }>(
+    '/capture',
+    async (req, reply) => {
+      const body = req.body ?? {};
+      const signedIn = currentAccount(req);
+      const values = { shop: body.shop, amount: body.amount, date: body.date, gstin: body.gstin };
+      const fail = (error: string) =>
+        reply.code(400).type('text/html; charset=utf-8').send(
+          renderCapturePage({ signedIn: signedIn !== null, error, values }),
+        );
+
+      const shop = (body.shop ?? '').trim();
+      if (shop.length < 2) return fail('Enter the shop’s name.');
+
+      const grandTotalMinor = parseAmountToMinor(body.amount ?? '');
+      if (grandTotalMinor === null || grandTotalMinor <= 0) {
+        return fail('Enter the total as it appears on the bill, for example 640.00.');
+      }
+
+      const date = (body.date ?? '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) {
+        return fail('Pick the date printed on the bill.');
+      }
+      if (date > new Date().toISOString().slice(0, 10)) {
+        return fail('The bill date can’t be in the future.');
+      }
+      // A valid date is one the financial-year logic can place.
+      financialYearOf(date);
+
+      let accountId = signedIn;
+      let setCookie: string | null = null;
+      if (!accountId) {
+        if (!accountLimiter.take(clientKey(req))) {
+          return reply.code(429).type('text/html; charset=utf-8').send(
+            page({ title: 'One moment' }, html`<div class="card"><h1>One moment</h1>
+              <p>Too many attempts from this connection. Try again in a minute.</p></div>`),
+          );
+        }
+        const phone = normalisePhone(body.phone);
+        if (!phone) return fail('Enter a valid 10-digit mobile number so we can keep this bill for you.');
+        const existing = people.findAccountByPhone(db, phone);
+        accountId = existing?.id ?? people.createAccount(db, { phoneE164: phone }).account.id;
+        setCookie = sessionCookie(signSession(accountId));
+      }
+
+      const view = createManualBill(db, {
+        accountId,
+        merchantName: shop,
+        gstin: body.gstin ?? null,
+        documentDateKey: date,
+        grandTotalMinor,
+      });
+
+      const reply2 = reply.header('Cache-Control', 'no-store, private').type('text/html; charset=utf-8');
+      if (setCookie) reply2.header('Set-Cookie', setCookie);
+      return reply2.send(
+        billsRepo.countByOwner(db, accountId) === 1
+          ? renderFirstBillState(view)
+          : renderClaimPage(
+              {
+                kind: 'owner', billId: view.id, view, identity: null,
+                requiresSecondFactor: false, secondFactorPrompt: null, message: '', nextAction: 'none',
+              },
+              '',
+            ),
+      );
+    },
+  );
 }
 
 function normalisePhone(raw: string | undefined): string | null {

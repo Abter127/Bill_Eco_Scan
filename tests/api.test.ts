@@ -279,6 +279,63 @@ describe('J3 — finding a bill under pressure', () => {
   });
 });
 
+describe('J2 — add a paper bill (no more /capture 404)', () => {
+  it('serves the capture page instead of a 404', async () => {
+    const { app } = await world();
+    const res = await app.inject({ method: 'GET', url: '/capture' });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('Add a paper bill');
+    // The conditional phone field must render as HTML, not be escaped into text.
+    expect(res.body).toContain('name="phone"');
+    expect(res.body).not.toContain('&lt;input');
+  });
+
+  it('creates a user-typed bill and lands the new account on the one-bill screen', async () => {
+    const { app } = await world();
+    const res = await app.inject({
+      method: 'POST', url: '/capture',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'shop=Gupta Kirana&amount=640.00&date=2026-09-10&phone=9812345678',
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['set-cookie']).toMatch(/bh_session=/);
+    expect(res.body).toContain('Gupta Kirana');
+    expect(res.body).toMatch(/640/);
+    // A typed record is never a tax invoice.
+    expect(res.body).toContain('Not a tax invoice');
+    // E8: a list of one is a designed screen.
+    expect(res.body).toContain('What happens next');
+  });
+
+  it('bounces a bad amount back to the form without creating a bill', async () => {
+    const { w, app } = await world();
+    const before = w.db.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM bills').get()!.n;
+    const res = await app.inject({
+      method: 'POST', url: '/capture',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'shop=Gupta Kirana&amount=notanumber&date=2026-09-10&phone=9812345678',
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain('Add a paper bill');
+    // The error banner is real markup, not escaped source.
+    expect(res.body).toContain('class="note warn"');
+    expect(res.body).not.toContain('&lt;div');
+    expect(w.db.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM bills').get()!.n).toBe(before);
+  });
+
+  it('rejects a future bill date', async () => {
+    const { app } = await world();
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    const res = await app.inject({
+      method: 'POST', url: '/capture',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: `shop=Gupta Kirana&amount=100&date=${tomorrow}&phone=9812345678`,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toMatch(/future/i);
+  });
+});
+
 describe('J4 — verifying a return at the counter', () => {
   it('returns the verdict and nothing about the customer', async () => {
     const { w, app, terminalHeaders } = await world();

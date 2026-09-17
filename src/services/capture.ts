@@ -391,7 +391,7 @@ function buildCapturedBill(db: Db, a: BuildArgs): CanonicalBill {
  * E3 merchant resolution. GSTIN is the identity; the trade name is display
  * only. A name mismatch never splits one merchant into two.
  */
-function resolveMerchant(
+export function resolveMerchant(
   db: Db, gstin: string | null, name: string | null,
 ): { merchantId: string; outletId: string; created: boolean } {
   if (gstin) {
