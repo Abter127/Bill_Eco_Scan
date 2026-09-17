@@ -81,6 +81,10 @@ for (const [i, seed] of seeds.entries()) {
 
 registry.recordHeartbeat(db, terminal.id);
 
+// Honour PORT so a copied URL actually resolves; printing a hardcoded 8080
+// when the server is about to listen elsewhere makes the first run look broken.
+const base = process.env.BILLING_HUB_PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 8080}`;
+
 console.log(`
 Seeded.
 
@@ -92,9 +96,9 @@ Seeded.
 Start the server with:   npm run dev
 
 Then open:
-  Claim page     http://localhost:8080/c/${lastToken ?? '<token>'}
+  Claim page     ${base}/c/${lastToken ?? '<token>'}
   Merchant console  (send the terminal headers)
-    curl -s http://localhost:8080/console/${outlet.id} \\
+    curl -s ${base}/console/${outlet.id} \\
       -H 'x-terminal-id: ${terminal.id}' \\
       -H 'x-terminal-secret: ${terminalSecret}'
 `);

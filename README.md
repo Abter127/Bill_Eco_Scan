@@ -70,16 +70,29 @@ docs/          Requirements traceability, and the open decisions as implemented.
 
 ## Running it
 
+Needs **Node >= 20.11** (22 recommended). `better-sqlite3` is the only native
+dependency and ships prebuilt binaries for mainstream platforms.
+
 ```bash
-npm install
-npm test              # 231 tests
+git clone -b claude/project-build-errhw3 https://github.com/Abter127/Bill_Eco_Scan.git
+cd Bill_Eco_Scan
+npm ci
+
+npm test                                    # 231 tests
 npm run typecheck
 
-npm run seed          # creates a demo merchant, till and three bills
-npm run dev           # http://localhost:8080
+export BILLING_HUB_SECRET=$(openssl rand -hex 32)   # see the note below
+npm run seed                                # demo merchant, till and three bills
+npm run dev                                 # http://localhost:8080
 ```
 
 `npm run seed` prints a claim-page URL and the terminal credentials for the console.
+Open the claim URL in a browser — that is the product's front door.
+
+> **Set `BILLING_HUB_SECRET`.** Without it each process generates its own random
+> signing key, so sessions break on every restart and cannot be shared across
+> processes. It throws outright in production; in development it fails quietly,
+> which is worse. `PORT` is honoured by both the server and the seed output.
 
 ### The agent
 
