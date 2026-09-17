@@ -62,7 +62,7 @@ src/
   web/         Server-rendered claim page and merchant console. No client bundle.
   agent/       The on-premise print-capture agent and its durable outbox.
 
-tests/         230 tests, organised by the PRD's edge-case sections.
+tests/         231 tests, organised by the PRD's edge-case sections.
 docs/          Requirements traceability, and the open decisions as implemented.
 ```
 
@@ -72,7 +72,7 @@ docs/          Requirements traceability, and the open decisions as implemented.
 
 ```bash
 npm install
-npm test              # 230 tests
+npm test              # 231 tests
 npm run typecheck
 
 npm run seed          # creates a demo merchant, till and three bills
@@ -173,3 +173,15 @@ Written down because each was silent, and the kind of thing that ships:
 - Link timestamps used wall time, so a credit note replayed after an outage started its
   orphan-alert clock at reconnect rather than at the return.
 - The agent re-queued permanent 4xx rejections forever.
+
+Found later, by running the app rather than the tests:
+
+- **The PDF rendered the rupee sign as `?`.** A base-14 PDF font cannot draw
+  U+20B9, so a tax document read "?955.50" to the person being asked to trust
+  it. Now transliterated to "Rs.", which is what thermal slips print anyway.
+- The merchant console printed the till's raw UUID under every row; the shop
+  owner knows that till as "Till 1".
+- The expired-token page printed the answer to its own confirmation question in
+  the input placeholder.
+- The claim page's "one request" story was untrue: browsers fetched
+  `/favicon.ico` and got a 404. The icon is now an inlined data URI.

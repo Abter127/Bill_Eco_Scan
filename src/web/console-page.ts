@@ -29,6 +29,11 @@ export function renderConsole(
   bills: MerchantVisibleBill[],
   quarantined: QuarantineEntry[],
 ): string {
+  // The merchant knows their till as "Till 1", not as a UUID. The console is
+  // read by a shop owner, so every identifier on it should be one they chose.
+  const terminalLabels = new Map(summary.captureGaps.map((g) => [g.terminalId, g.label]));
+  const tillLabel = (id: string | null) => (id ? terminalLabels.get(id) ?? '' : '');
+
   const claimPct = Math.min(1, summary.claimRateTarget === 0 ? 0 : summary.claimRate / summary.claimRateTarget);
   const paperPct = Math.min(1, summary.paperSuppressionTarget === 0 ? 0 : summary.paperSuppressionRate / summary.paperSuppressionTarget);
 
@@ -113,7 +118,7 @@ ${when(
       bills
         .map(
           (b) => html`<tr>
-            <td>${b.documentDateKey ?? '—'}<div class="muted">${b.terminalId ?? ''}</div></td>
+            <td>${b.documentDateKey ?? '—'}<div class="muted">${tillLabel(b.terminalId)}</div></td>
             <td>${b.documentNumber ?? '—'}</td>
             <td class="num">${(b.grandTotalMinor / 100).toFixed(2)}</td>
             <td class="num">${b.claimed ? 'Yes' : 'No'}</td>

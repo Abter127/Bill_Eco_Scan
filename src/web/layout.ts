@@ -86,6 +86,12 @@ export function page(opts: LayoutOptions, body: string): string {
 <meta name="referrer" content="strict-origin">
 <meta name="robots" content="noindex,nofollow">
 <meta name="color-scheme" content="light dark">
+<!--
+  Inlined as a data URI rather than served from a route: the claim page's whole
+  performance story is that it is a single request on a cold 4G device, and a
+  browser will fetch /favicon.ico on its own otherwise (and 404 on it).
+-->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b5e4b'/%3E%3Cpath d='M9 8h11l4 4v12a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z' fill='%23fff'/%3E%3Cpath d='M11 15h10M11 19h7' stroke='%231b5e4b' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
 <title>${esc(opts.title)}</title>
 <style>${CSS}</style>
 </head><body${opts.bodyClass ? ` class="${esc(opts.bodyClass)}"` : ''}>

@@ -1,4 +1,4 @@
-import { esc, html, raw, when } from './html.js';
+import { html, raw, when } from './html.js';
 import { page } from './layout.js';
 import type { BillView } from '../services/billview.js';
 import type { ClaimResolution } from '../services/claim.js';
@@ -182,10 +182,12 @@ export function renderClaimPage(resolution: ClaimResolution, token: string): str
             <input class="field" type="tel" name="phone" inputmode="numeric" autocomplete="tel"
                    placeholder="Mobile number" aria-label="Mobile number" required>
             <input class="field" type="text" name="secondFactor" inputmode="numeric" maxlength="4"
-                   placeholder="Last 4 digits of the total (${esc(id.amountDecimal)})"
-                   aria-label="Last 4 digits of the total" required>
+                   placeholder="Last 4 digits of the total on your slip"
+                   aria-label="Last 4 digits of the total on your slip" required>
             <button class="btn" type="submit">Add this bill</button>
           </form>
+          <p class="muted">We ask so a code scanned by mistake doesn’t end up on the wrong
+            account. Read it off the printed slip in your hand.</p>
           <a class="btn secondary" href="/capture">Photograph the slip instead</a>
         </div>`);
     }

@@ -188,6 +188,17 @@ describe('R-06 / J3 — a PDF a stranger will accept', () => {
     expect(text).toContain('From the counter'); // the provenance badge
   });
 
+  it('renders the rupee sign readably instead of as a placeholder', async () => {
+    const w = makeWorld();
+    const bill = issueAndClaim(w);
+    const text = renderBillPdf(w.db, bill.billId!, NOW).toString('latin1');
+
+    // A base-14 PDF font cannot draw U+20B9. A tax document that reads
+    // "?955.50" looks broken to the person being asked to trust it.
+    expect(text).toContain('Rs.955.00');
+    expect(text).not.toMatch(/\?955\.00/);
+  });
+
   it('builds a warranty pack with serial, dates and the rule’s source (R-05)', async () => {
     const w = makeWorld({ category: 'electronics' });
     const bill = issueAndClaim(w);
