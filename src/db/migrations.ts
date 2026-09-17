@@ -393,4 +393,17 @@ export const MIGRATIONS: Migration[] = [
     );
     `,
   },
+  {
+    id: '003_shared_copies',
+    sql: `
+    -- E1 split payment: the second payer's read-only copy repeats the original
+    -- document number. It is not a second tax document, so the uniqueness rule
+    -- that protects the merchant's invoice sequence must not apply to it.
+    ALTER TABLE bills ADD COLUMN is_shared_copy INTEGER NOT NULL DEFAULT 0;
+    DROP INDEX idx_bills_docnum_fy;
+    CREATE UNIQUE INDEX idx_bills_docnum_fy
+      ON bills(merchant_id, financial_year, document_number, document_type)
+      WHERE document_number IS NOT NULL AND is_shared_copy = 0;
+    `,
+  },
 ];

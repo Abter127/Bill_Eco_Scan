@@ -20,7 +20,7 @@ interface BillRow {
   payment_method: string | null; buyer_gstin: string | null; place_of_supply: string | null;
   provenance: string; content_fingerprint: string; idempotency_key: string | null;
   state: string; owner_account_id: string | null; owner_profile_id: string | null;
-  sensitivity_class: string; not_a_tax_invoice: number; expensable: number;
+  sensitivity_class: string; not_a_tax_invoice: number; expensable: number; is_shared_copy: number;
   image_ref: string | null; raw_source_ref: string | null; claimed_at: string | null;
   hold_expires_at: string | null; created_at: string;
 }
@@ -79,6 +79,7 @@ function toBill(r: BillRow, lines: BillLine[], fields: FieldConfidence[]): Canon
     ownerAccountId: r.owner_account_id, ownerProfileId: r.owner_profile_id,
     sensitivityClass: r.sensitivity_class as SensitivityClass,
     notATaxInvoice: intToBool(r.not_a_tax_invoice), expensable: intToBool(r.expensable),
+    isSharedCopy: intToBool(r.is_shared_copy),
     imageRef: r.image_ref, rawSourceRef: r.raw_source_ref, claimedAt: r.claimed_at,
     holdExpiresAt: r.hold_expires_at, createdAt: r.created_at, lines, fields,
   };
@@ -96,7 +97,7 @@ export function insertBill(db: Db, bill: CanonicalBill): void {
     subtotal_minor, tax_total_minor, discount_total_minor, round_off_minor, grand_total_minor,
     line_sum_minor, sum_discrepancy_minor, sum_discrepancy_flagged, payment_method, buyer_gstin,
     place_of_supply, provenance, content_fingerprint, idempotency_key, state, owner_account_id,
-    owner_profile_id, sensitivity_class, not_a_tax_invoice, expensable, image_ref, raw_source_ref,
+    owner_profile_id, sensitivity_class, not_a_tax_invoice, expensable, is_shared_copy, image_ref, raw_source_ref,
     claimed_at, hold_expires_at, created_at
   ) VALUES (
     @id, @bill_group_id, @merchant_id, @outlet_id, @terminal_id, @document_type, @document_number,
@@ -105,7 +106,7 @@ export function insertBill(db: Db, bill: CanonicalBill): void {
     @subtotal_minor, @tax_total_minor, @discount_total_minor, @round_off_minor, @grand_total_minor,
     @line_sum_minor, @sum_discrepancy_minor, @sum_discrepancy_flagged, @payment_method, @buyer_gstin,
     @place_of_supply, @provenance, @content_fingerprint, @idempotency_key, @state, @owner_account_id,
-    @owner_profile_id, @sensitivity_class, @not_a_tax_invoice, @expensable, @image_ref, @raw_source_ref,
+    @owner_profile_id, @sensitivity_class, @not_a_tax_invoice, @expensable, @is_shared_copy, @image_ref, @raw_source_ref,
     @claimed_at, @hold_expires_at, @created_at
   )`).run({
     id: bill.id, bill_group_id: bill.billGroupId, merchant_id: bill.merchantId,
@@ -126,7 +127,8 @@ export function insertBill(db: Db, bill: CanonicalBill): void {
     content_fingerprint: bill.contentFingerprint, idempotency_key: bill.idempotencyKey,
     state: bill.state, owner_account_id: bill.ownerAccountId, owner_profile_id: bill.ownerProfileId,
     sensitivity_class: bill.sensitivityClass, not_a_tax_invoice: boolToInt(bill.notATaxInvoice),
-    expensable: boolToInt(bill.expensable), image_ref: bill.imageRef,
+    expensable: boolToInt(bill.expensable), is_shared_copy: boolToInt(bill.isSharedCopy ?? false),
+    image_ref: bill.imageRef,
     raw_source_ref: bill.rawSourceRef, claimed_at: bill.claimedAt,
     hold_expires_at: bill.holdExpiresAt, created_at: bill.createdAt,
   });

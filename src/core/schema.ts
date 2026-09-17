@@ -224,6 +224,12 @@ export interface CanonicalBill {
   notATaxInvoice: boolean;
   /** Set when a shared read-only copy exists; blocks double-expensing (E1). */
   expensable: boolean;
+  /**
+   * True on the read-only copy handed to the second payer of a split bill (E1).
+   * It repeats the original's document number, so it is excluded from the
+   * per-merchant-per-financial-year uniqueness rule that governs real documents.
+   */
+  isSharedCopy: boolean;
   imageRef: string | null;
   rawSourceRef: string | null;
   claimedAt: string | null;

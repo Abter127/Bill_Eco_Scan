@@ -105,8 +105,18 @@ const LEADING_QTY = /^\s*(\d+(?:\.\d+)?)\s+(?=[A-Za-zऀ-෿])/;
 const HSN_IN_TEXT = /\b(?:HSN|SAC)\s*[:.]?\s*(\d{4,8})\b/i;
 const SERIAL_IN_TEXT = /\b(?:S\/?N|SERIAL|IMEI)\s*[:.]?\s*([A-Z0-9-]{6,})\b/i;
 const GST_RATE_IN_TEXT = /\b(\d{1,2}(?:\.\d{1,2})?)\s*%/;
+/**
+ * The trailing \b after the keyword group matters: without it, `INV` matches
+ * inside the word `INVOICE` on a "TAX INVOICE" header line and captures "OICE"
+ * as the bill number. The captured token must also contain a digit, because a
+ * document number always does and a stray word never should.
+ */
 const DOC_NUMBER =
-  /\b(?:TAX\s*INVOICE|INVOICE|BILL|INV|RECEIPT|MEMO)\s*(?:NO|NUMBER|#)?\s*[:.#-]?\s*([A-Z0-9][A-Z0-9/\\-]{1,24})\b/i;
+  /\b(?:TAX\s*INVOICE|INVOICE|BILL|INV|RECEIPT|MEMO)\b\s*(?:NO|NUMBER|#)?\s*[:.#-]?\s*([A-Z0-9][A-Z0-9/\\-]{1,24})\b/i;
+
+/** A continuation line carrying only quantity and rate: "2 x 145.00". */
+const QTY_CONTINUATION =
+  /^\s*\d+(?:\.\d+)?\s*(?:KG|GM|G|L|ML|PC|PCS|NOS|UNIT)?\s*(?:X|@|\*)\s*(?:₹|RS\.?|INR)?\s*\d{1,3}(?:[,\s]\d{2,3})*(?:\.\d{1,2})?\s*$/i;
 
 function matchesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((p) => p.test(text));
@@ -187,7 +197,7 @@ export function extractBillFromText(
   let documentNumber: string | null = null;
   for (let i = 0; i < textLines.length; i++) {
     const m = DOC_NUMBER.exec(textLines[i]!.text);
-    if (m && m[1] && !/^(NO|NUMBER)$/i.test(m[1])) {
+    if (m && m[1] && /\d/.test(m[1]) && !/^(NO|NUMBER)$/i.test(m[1])) {
       documentNumber = m[1].trim();
       push('documentNumber', confidenceOf(i), documentNumber);
       break;
@@ -297,6 +307,21 @@ export function extractBillFromText(
 
     const lineTotalMinor = amountOnLine(raw, currency);
     if (lineTotalMinor === null) continue;
+
+    // Many receipts print the item and its amount on one line and the quantity
+    // and rate underneath. That continuation belongs to the item above it — as
+    // its own row it would be counted twice and the line sum would come out at
+    // roughly double the real one.
+    if (QTY_CONTINUATION.test(raw)) {
+      const previous = lines[lines.length - 1];
+      const qp = QTY_PRICE.exec(raw);
+      if (previous && qp) {
+        previous.qty = Number(qp[1]) || previous.qty;
+        previous.uom = qp[2] ? qp[2].toUpperCase() : previous.uom;
+        previous.unitPriceMinor = parseAmountToMinor(qp[3]!, currency);
+      }
+      continue;
+    }
 
     const description = cleanDescription(raw);
     if (!description || /^[\d\s.,-]*$/.test(description)) continue;

@@ -3,6 +3,7 @@ import { tx } from '../db/sqlite.js';
 import { transition, isClaimable } from '../core/lifecycle.js';
 import { toDecimalString, money } from '../core/money.js';
 import { assessDuplicate, type DedupeCandidate } from '../core/dedupe.js';
+import { newId } from '../core/ids.js';
 import { higherProvenance } from '../core/provenance.js';
 import type { CanonicalBill } from '../core/schema.js';
 import * as billsRepo from '../db/repo/bills.js';
@@ -215,6 +216,23 @@ export function claimBill(db: Db, req: ClaimRequest): ClaimResult {
     }
   }
 
+  // E2: the loser of a simultaneous claim must land on the race message with a
+  // path to dispute — not on "this bill can no longer be claimed". The bill is
+  // already in the `claimed` state by the time the second request arrives, so
+  // the token has to be checked before the lifecycle state.
+  if (token.consumedAt) {
+    const claimedByThisAccount = token.consumedByAccountId === req.accountId;
+    return {
+      ok: false,
+      reason: 'already_claimed',
+      billId: bill.id,
+      nextAction: claimedByThisAccount ? 'none' : 'dispute',
+      message: claimedByThisAccount
+        ? 'You’ve already added this bill.'
+        : 'Someone else added this bill a moment before you. If that wasn’t meant to happen, tell us and we’ll sort it out.',
+    };
+  }
+
   if (!isClaimable(bill.state)) {
     return {
       ok: false, reason: 'not_claimable', billId: bill.id, nextAction: 'none',
@@ -425,7 +443,7 @@ export function shareBillCopy(
 
     const copy: CanonicalBill = {
       ...original,
-      id: crypto.randomUUID(),
+      id: newId(),
       // Same group, so annotations and amendments reach both sides.
       billGroupId: original.billGroupId,
       ownerAccountId: toAccountId,
@@ -434,6 +452,9 @@ export function shareBillCopy(
       claimedAt: now.toISOString(),
       idempotencyKey: null,
       expensable: false, // the whole point: it cannot be claimed twice
+      // Not a second tax document: it carries the same document number as the
+      // original and must not collide with it on the merchant's sequence.
+      isSharedCopy: true,
       createdAt: now.toISOString(),
     };
     billsRepo.insertBill(db, copy);

@@ -376,6 +376,7 @@ function buildCapturedBill(db: Db, a: BuildArgs): CanonicalBill {
     sensitivityClass,
     notATaxInvoice: a.extracted.looksHandwritten || !a.extracted.gstin || a.provenance === 'photo_screen',
     expensable: a.provenance !== 'photo_screen',
+    isSharedCopy: false,
     imageRef: a.capture.imageRef,
     rawSourceRef: null,
     claimedAt: a.now.toISOString(),

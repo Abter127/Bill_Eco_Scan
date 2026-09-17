@@ -64,6 +64,41 @@ export function issueClaimToken(
   return { id, billId, secret, expiresAt, requiresSecondFactor, secondFactorHint };
 }
 
+/**
+ * M-03: "Locally-signed tokens validate on reconnect."
+ *
+ * During an outage the agent mints the claim token itself and prints its QR, so
+ * the customer's experience at the counter is unchanged. On reconnect the agent
+ * replays the token alongside the bill and we register it as-is — otherwise the
+ * QR the customer already photographed would resolve to nothing.
+ */
+export function registerOfflineToken(
+  db: Db,
+  billId: string,
+  secret: string,
+  issuedAt: string,
+  ttlMs: number = CLAIM_TOKEN_TTL_MS,
+  grandTotalMinor = 0,
+): IssuedToken {
+  const id = newId();
+  // The TTL runs from when the token was shown at the counter, not from when we
+  // finally heard about it; the offline-scan grace in `claimBill` covers the gap.
+  const expiresAt = new Date(Date.parse(issuedAt) + ttlMs).toISOString();
+  const requiresSecondFactor = grandTotalMinor >= HIGH_VALUE_SECOND_FACTOR_MINOR;
+
+  db.prepare(`INSERT OR IGNORE INTO claim_tokens
+    (id, bill_id, token_hash, issued_at, expires_at, offline_signed, scan_count,
+     requires_second_factor, second_factor_hint)
+    VALUES (?,?,?,?,?,1,0,?,?)`)
+    .run(id, billId, hashToken(secret), issuedAt, expiresAt,
+      boolToInt(requiresSecondFactor), requiresSecondFactor ? 'last-4-of-amount' : null);
+
+  return {
+    id, billId, secret, expiresAt, requiresSecondFactor,
+    secondFactorHint: requiresSecondFactor ? 'last-4-of-amount' : null,
+  };
+}
+
 export interface TokenRecord {
   id: string;
   billId: string;

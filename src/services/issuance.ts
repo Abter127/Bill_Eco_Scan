@@ -209,6 +209,12 @@ export interface IngestOptions {
   declaredReprint?: boolean;
   /** T-05: honoured where the counter knows the customer's preference. */
   formatPreference?: 'paper' | 'digital' | 'both';
+  /**
+   * M-03: a token the agent minted and displayed during an outage. Registering
+   * it rather than issuing a new one is what makes the QR the customer already
+   * scanned resolve once we reconnect.
+   */
+  offlineClaimToken?: { secret: string; issuedAt: string };
 }
 
 export function ingestBill(
@@ -345,6 +351,7 @@ export function ingestBill(
     sensitivityClass,
     notATaxInvoice: opts.notATaxInvoice ?? payload.documentType === 'kacha',
     expensable: true,
+    isSharedCopy: false,
     imageRef: null,
     rawSourceRef: payload.rawSourceRef,
     claimedAt: null,
@@ -425,11 +432,16 @@ export function ingestBill(
     // E1 "capture succeeded, print failed": never suppress the QR because the
     // printer failed. If both fail the sale still completes and our outage is
     // invisible to the shopper.
-    const token = claims.issueClaimToken(db, billId, {
-      now,
-      grandTotalMinor: payload.grandTotalMinor,
-      offlineSigned: ctx.offlineSigned ?? false,
-    });
+    const token = opts.offlineClaimToken
+      ? claims.registerOfflineToken(
+          db, billId, opts.offlineClaimToken.secret, opts.offlineClaimToken.issuedAt,
+          undefined, payload.grandTotalMinor,
+        )
+      : claims.issueClaimToken(db, billId, {
+          now,
+          grandTotalMinor: payload.grandTotalMinor,
+          offlineSigned: ctx.offlineSigned ?? false,
+        });
     billsRepo.updateBillState(db, billId, 'unclaimed');
 
     // T-05: paper is always the fallback. Suppression happens only on a stored

@@ -112,6 +112,7 @@ export function applyCreditNote(db: Db, input: CreditNoteInput): CreditNoteResul
       sensitivityClass: original?.sensitivityClass ?? 'standard',
       notATaxInvoice: false,
       expensable: original?.expensable ?? true,
+      isSharedCopy: false,
       imageRef: null,
       rawSourceRef: null,
       claimedAt: original?.claimedAt ?? null,
