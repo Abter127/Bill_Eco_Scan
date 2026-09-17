@@ -80,9 +80,12 @@ export function registerMerchantRoutes(app: FastifyInstance, db: Db): void {
       { provenance: 'print_stream', offlineClaimToken },
     );
 
-    // 200 rather than 201 on a replay, so the agent can tell them apart without
-    // parsing the body.
-    return reply.code(result.outcome === 'created' ? 201 : 200).send(result);
+    // 201 only when this call actually created the bill. A replay of the same
+    // idempotency key is a 200, so the agent can tell them apart from the
+    // status line alone.
+    return reply
+      .code(result.outcome === 'created' && !result.replayed ? 201 : 200)
+      .send(result);
   });
 
   /** M-01: raw ESC/POS bytes, framed and classified server-side. */

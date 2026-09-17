@@ -17,9 +17,11 @@ export interface ServerOptions {
 export async function buildServer(opts: ServerOptions): Promise<FastifyInstance> {
   const app = Fastify({
     logger: opts.logger ?? false,
-    // The claim page is a bearer-token URL; keeping it out of access logs by
-    // default is cheaper than redacting it later.
-    disableRequestLogging: true,
+    // The claim page URL *is* the bearer token, so per-request logging is off:
+    // keeping it out of access logs is cheaper than redacting it later. Only
+    // set when a logger exists, since the option is otherwise a no-op that
+    // emits a deprecation notice. (Fastify 6 moves this under `logController`.)
+    ...(opts.logger ? { disableRequestLogging: true } : {}),
     bodyLimit: 8 * 1024 * 1024,
     trustProxy: true,
   });

@@ -49,6 +49,12 @@ export interface IngestResult {
   claimTokenExpiresAt?: string;
   requiresSecondFactor?: boolean;
   reason: string;
+  /**
+   * True when this response was served from the idempotency ledger rather than
+   * produced by storing a bill. The agent uses it to distinguish a genuinely
+   * new bill from a replayed one without diffing the body.
+   */
+  replayed?: boolean;
   /** What the agent should do with paper (T-05). */
   paper: 'print' | 'suppress';
   warnings: string[];
@@ -236,6 +242,7 @@ export function ingestBill(
   if (existing) {
     return {
       ...(existing.response as IngestResult),
+      replayed: true,
       reason: 'replayed: this idempotency key was already processed',
     };
   }

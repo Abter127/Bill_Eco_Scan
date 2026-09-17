@@ -97,10 +97,29 @@ const DATE_IN_TEXT =
   /\b(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[\s\-/.]*[A-Za-z]{3,9}[\s\-/.]*\d{2,4})\b/;
 const TIME_IN_TEXT = /\b([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?\s*(AM|PM)?\b/i;
 
+/**
+ * A printed amount, grouped or not.
+ *
+ * The alternation is load-bearing. A pattern of only `\d{1,3}([,\s]\d{2,3})*`
+ * matches the *last three digits* of an ungrouped number when anchored to the
+ * end of a line, so "GRAND TOTAL 2205.00" reads as 205.00 and "38500.00" reads
+ * as 500.00 — wrong, and confident about it, which is the one failure mode E3
+ * says the pipeline exists to prevent. Ungrouped totals are common on thermal
+ * slips, so the plain-digits branch comes first in intent and the grouped
+ * branch handles the Indian 1,23,456 convention.
+ */
+const AMOUNT_BODY = String.raw`(?:\d{1,3}(?:[,\s]\d{2,3})+|\d+)(?:\.\d{1,2})?`;
+
 /** Trailing money on a line: "PANEER BUTTER MASALA      240.00" */
-const TRAILING_AMOUNT = /(-?\(?\s*(?:₹|RS\.?|INR)?\s*\d{1,3}(?:[,\s]\d{2,3})*(?:\.\d{1,2})?\s*\)?-?)\s*$/i;
+const TRAILING_AMOUNT = new RegExp(
+  String.raw`(-?\(?\s*(?:₹|RS\.?|INR)?\s*${AMOUNT_BODY}\s*\)?-?)\s*$`,
+  'i',
+);
 /** Quantity forms: "2 x 45.00", "2 @ 45.00", "2.500 KG x 60.00" */
-const QTY_PRICE = /(?:^|\s)(\d+(?:\.\d+)?)\s*(KG|GM|G|L|ML|PC|PCS|NOS|UNIT)?\s*(?:X|@|\*)\s*(?:₹|RS\.?|INR)?\s*(\d{1,3}(?:[,\s]\d{2,3})*(?:\.\d{1,2})?)/i;
+const QTY_PRICE = new RegExp(
+  String.raw`(?:^|\s)(\d+(?:\.\d+)?)\s*(KG|GM|G|L|ML|PC|PCS|NOS|UNIT)?\s*(?:X|@|\*)\s*(?:₹|RS\.?|INR)?\s*(${AMOUNT_BODY})`,
+  'i',
+);
 const LEADING_QTY = /^\s*(\d+(?:\.\d+)?)\s+(?=[A-Za-zऀ-෿])/;
 const HSN_IN_TEXT = /\b(?:HSN|SAC)\s*[:.]?\s*(\d{4,8})\b/i;
 const SERIAL_IN_TEXT = /\b(?:S\/?N|SERIAL|IMEI)\s*[:.]?\s*([A-Z0-9-]{6,})\b/i;
@@ -115,8 +134,10 @@ const DOC_NUMBER =
   /\b(?:TAX\s*INVOICE|INVOICE|BILL|INV|RECEIPT|MEMO)\b\s*(?:NO|NUMBER|#)?\s*[:.#-]?\s*([A-Z0-9][A-Z0-9/\\-]{1,24})\b/i;
 
 /** A continuation line carrying only quantity and rate: "2 x 145.00". */
-const QTY_CONTINUATION =
-  /^\s*\d+(?:\.\d+)?\s*(?:KG|GM|G|L|ML|PC|PCS|NOS|UNIT)?\s*(?:X|@|\*)\s*(?:₹|RS\.?|INR)?\s*\d{1,3}(?:[,\s]\d{2,3})*(?:\.\d{1,2})?\s*$/i;
+const QTY_CONTINUATION = new RegExp(
+  String.raw`^\s*\d+(?:\.\d+)?\s*(?:KG|GM|G|L|ML|PC|PCS|NOS|UNIT)?\s*(?:X|@|\*)\s*(?:₹|RS\.?|INR)?\s*${AMOUNT_BODY}\s*$`,
+  'i',
+);
 
 function matchesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((p) => p.test(text));

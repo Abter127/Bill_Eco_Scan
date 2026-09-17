@@ -146,6 +146,32 @@ describe('extraction (R-01, E1 line sums)', () => {
     expect(e.sumDiscrepancyFlagged).toBe(false);
   });
 
+  it('reads a four-or-more digit amount whole (regression: 2205 read as 205)', () => {
+    // An ungrouped total is normal on a thermal slip. A grouping-only pattern
+    // matches the last three digits when anchored to the end of the line, which
+    // turned 2205.00 into 205.00 and 38500.00 into 500.00 — wrong, and
+    // confident, which is the failure E3 exists to prevent.
+    for (const [printed, expected] of [
+      [2205, 220500], [38500, 3850000], [955.5, 95550], [123456.78, 12345678], [7, 700],
+    ] as Array<[number, number]>) {
+      const e = extractBillFromText(
+        linesOf(escposReceipt({ items: [{ name: 'Widget', amount: printed }], total: printed })),
+        { source: 'printed', captureDate: NOW },
+      );
+      expect(e.grandTotalMinor).toBe(expected);
+      expect(e.lines[0]!.lineTotalMinor).toBe(expected);
+      expect(e.sumDiscrepancyFlagged).toBe(false);
+    }
+  });
+
+  it('still reads Indian grouped amounts', () => {
+    const e = extractBillFromText(
+      ['TAX INVOICE', 'Bill No: INV/1', 'Date: 17/09/2026', 'GRAND TOTAL           1,23,456.78'],
+      { source: 'printed', captureDate: NOW },
+    );
+    expect(e.grandTotalMinor).toBe(12345678);
+  });
+
   it('does not count a "2 x 145.00" continuation line as a second item', () => {
     const e = extractBillFromText(
       linesOf(escposReceipt({

@@ -95,9 +95,15 @@ export function recordCorrection(
   existing: FieldConfidence[],
   fieldPath: string,
   newValue: string,
+  /**
+   * The value on the bill before this correction. Passed in because a bill that
+   * arrived structured (from the agent or a connector) has no extraction row to
+   * read the previous value from, and losing it would hide the edit.
+   */
+  currentValue: string | null = null,
 ): FieldConfidence[] {
   const prior = existing.find((f) => f.fieldPath === fieldPath && f.source !== 'user');
-  const originalValue = prior?.originalValue ?? null;
+  const originalValue = prior?.originalValue ?? currentValue;
   const kept = existing.filter((f) => !(f.fieldPath === fieldPath && f.source === 'user'));
   return [
     ...kept,
@@ -115,12 +121,17 @@ export function recordCorrection(
   ];
 }
 
-/** True when any amount on this bill was changed by the user (export flag). */
+/**
+ * True when any amount on this bill was changed by the user (export flag, E6).
+ *
+ * A `user` source on an amount *is* the edit — whether we can also show what it
+ * used to be is a separate question, and requiring the old value here would let
+ * the flag drop off structured bills that never had an extraction row.
+ */
 export function hasUserEditedAmount(fields: FieldConfidence[]): boolean {
   return fields.some(
     (f) =>
       f.source === 'user' &&
-      /(?:grandTotalMinor|taxTotalMinor|subtotalMinor|lineTotalMinor)$/.test(f.fieldPath) &&
-      f.originalValue !== null,
+      /(?:grandTotalMinor|taxTotalMinor|subtotalMinor|lineTotalMinor)$/.test(f.fieldPath),
   );
 }

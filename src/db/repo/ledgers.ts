@@ -30,10 +30,16 @@ export function createLink(
     toMerchantId?: string | null;
     relation: LinkRelation;
     targetLineNos?: number[];
+    /**
+     * The document's own time, not wall time. A credit note replayed from the
+     * agent's queue after an outage must keep the time it was issued, or the
+     * orphan-amendment alert clock starts at reconnect instead of at the return.
+     */
+    now?: Date;
   },
 ): DocumentLink {
   const id = newId();
-  const at = nowIso();
+  const at = (input.now ?? new Date()).toISOString();
   const resolved = Boolean(input.toBillId);
   db.prepare(`INSERT INTO document_links
     (id, from_bill_id, to_bill_id, to_document_number, to_merchant_id, relation, target_line_nos, resolved, created_at)

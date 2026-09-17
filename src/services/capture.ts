@@ -460,7 +460,7 @@ export function applyCorrection(
   }
 
   return tx(db, () => {
-    const updated = recordCorrection(bill.fields, fieldPath, newValue);
+    const updated = recordCorrection(bill.fields, fieldPath, newValue, currentValueOf(bill, fieldPath));
     const added = updated.filter((f) => f.source === 'user' && f.fieldPath === fieldPath);
 
     db.prepare('DELETE FROM bill_fields WHERE bill_id = ? AND field_path = ? AND source = ?')
@@ -484,6 +484,19 @@ export function applyCorrection(
       message: 'Updated. We’ve kept what we originally read, and this bill now shows that you corrected it.',
     };
   });
+}
+
+/** The value a field holds right now, so a correction can record what changed. */
+function currentValueOf(bill: CanonicalBill, fieldPath: string): string | null {
+  const lineMatch = /^lines\.(\d+)\.(\w+)$/.exec(fieldPath);
+  if (lineMatch) {
+    const line = bill.lines.find((l) => l.lineNo === Number(lineMatch[1]));
+    if (!line) return null;
+    const value = (line as unknown as Record<string, unknown>)[lineMatch[2]!];
+    return value === null || value === undefined ? null : String(value);
+  }
+  const value = (bill as unknown as Record<string, unknown>)[fieldPath];
+  return value === null || value === undefined ? null : String(value);
 }
 
 function applyValueToBill(db: Db, billId: string, fieldPath: string, value: string): void {

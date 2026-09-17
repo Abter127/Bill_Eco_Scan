@@ -133,6 +133,7 @@ export function applyCreditNote(db: Db, input: CreditNoteInput): CreditNoteResul
         toMerchantId: merchantId,
         relation: 'credit_note_for',
         targetLineNos: input.returnedLines.map((l) => l.lineNo),
+        now,
       });
       return {
         creditNoteId: id, originalBillId: null, status: 'parked',
@@ -146,6 +147,7 @@ export function applyCreditNote(db: Db, input: CreditNoteInput): CreditNoteResul
       fromBillId: id, toBillId: original.id, toDocumentNumber: original.documentNumber,
       toMerchantId: merchantId, relation: 'credit_note_for',
       targetLineNos: input.returnedLines.map((l) => l.lineNo),
+      now,
     });
 
     // --- E4 partial return -------------------------------------------------
@@ -367,10 +369,20 @@ export function recordWarrantyReplacement(
 
   db.prepare('UPDATE bill_lines SET serial_number = ? WHERE bill_id = ? AND line_no = ?')
     .run(newSerialNumber, billId, lineNo);
-  ledgers.addAnnotation(
-    db, bill.billGroupId, bill.ownerAccountId ?? 'system', 'note',
-    `Warranty replacement on line ${lineNo}: new serial ${newSerialNumber} on ${replacementDateKey} (${w.rule})`,
-  );
+
+  const summary =
+    `Warranty replacement on line ${lineNo}: new serial ${newSerialNumber} on ${replacementDateKey} (${w.rule})`;
+
+  // An annotation belongs to an account. On a bill nobody has claimed yet there
+  // is no account to attach it to, so the event is recorded where it does
+  // belong — the audit log, which the eventual claimant can also read.
+  if (bill.ownerAccountId) {
+    ledgers.addAnnotation(db, bill.billGroupId, bill.ownerAccountId, 'note', summary);
+  }
+  ledgers.logAccess(db, {
+    billId, accountId: bill.ownerAccountId, actorType: 'merchant', actorId: bill.merchantId,
+    action: 'warranty_replacement', reason: summary,
+  });
 
   return {
     billId, lineNo, newSerialNumber, rule: w.rule,

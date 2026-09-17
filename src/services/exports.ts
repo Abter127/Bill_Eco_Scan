@@ -67,7 +67,7 @@ export const ASYNC_EXPORT_THRESHOLD = 2_000;
 const COLUMNS = [
   'Bill ID', 'Document number', 'Document type', 'Financial year', 'Date',
   'Shop (trade name)', 'Shop (legal name)', 'GSTIN', 'Outlet', 'Place of supply',
-  'Currency', 'Taxable value', 'CGST', 'SGST', 'IGST', 'Cess', 'Discount',
+  'Currency', 'HSN/SAC', 'Taxable value', 'CGST', 'SGST', 'IGST', 'Cess', 'Discount',
   'Round off', 'Total', 'Payment method', 'State', 'Counts as spend',
   'Source', 'Tax invoice', 'Amounts edited by user', 'Items',
 ] as const;
@@ -94,6 +94,9 @@ function billRow(db: Db, bill: CanonicalBill): Array<string | number | null> {
     outlet?.name ?? null,
     bill.placeOfSupply,
     bill.currency,
+    // A business buyer reconciling GSTR-2B needs the HSN/SAC codes, so they
+    // travel as their own column rather than buried in the item text.
+    [...new Set(bill.lines.map((l) => l.hsnSac).filter(Boolean))].join(' '),
     dec(bill.subtotalMinor),
     dec(cgst),
     dec(sgst),

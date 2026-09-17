@@ -100,7 +100,8 @@ const BILL_MARKERS: Array<{ pattern: RegExp; weight: number; name: string }> = [
 const CREDIT_MARKERS = [/\bCREDIT NOTE\b/, /\bREFUND (?:VOUCHER|SLIP|RECEIPT)\b/, /\bRETURN NOTE\b/];
 const VOID_MARKERS = [/\bVOID(?:ED)?\b/, /\bCANCELLED BILL\b/, /\bBILL CANCELLED\b/, /\bTRANSACTION CANCELLED\b/];
 
-const MONEY_LINE = /(?:^|\s)(?:₹|RS\.?|INR)?\s*\d{1,3}(?:[,\s]\d{2,3})*(?:\.\d{1,2})?\s*$/;
+/** Same grouped-or-plain alternation as the extractor — see AMOUNT_BODY there. */
+const MONEY_LINE = /(?:^|\s)(?:₹|RS\.?|INR)?\s*(?:\d{1,3}(?:[,\s]\d{2,3})+|\d+)(?:\.\d{1,2})?\s*$/;
 
 function normalizeLine(line: string): string {
   return line
